@@ -13,7 +13,7 @@ const float char_aspect = 0.5f;
 
 char screen[width * height + 1];
 
-vec3 sphere_center = {0.0f, 0.0f, 5.0f};
+vec3 sphere_center = {0.0f, 0.0f, 2.0f};
 float sphere_radius = 1.0f;
 
 float magnitude(vec3 vec) {
@@ -21,9 +21,7 @@ float magnitude(vec3 vec) {
 }
 
 float dot(vec3 v0, vec3 v1) {
-    float angle = cos((v0.x*v1.x) + (v0.y*v1.y) + (v0.z*v1.z));
-
-    return magnitude(v0) * magnitude(v1) * angle;
+    return (v0.x*v1.x) + (v0.y*v1.y) + (v0.z*v1.z);
 }
 
 vec3 normalize(vec3 vec) {
