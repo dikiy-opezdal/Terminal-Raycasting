@@ -6,15 +6,23 @@ typedef struct {
     float x, y, z;
 } vec3;
 
+typedef struct {
+    vec3 center;
+    float radius;
+} sphere_t;
+
 #define width  120
 #define height 30
-const float aspect = width / height;
-const float char_aspect = 0.5f;
+float aspect = width / height;
+float char_aspect = 0.5f;
+
+char *grayscale = " .:-=oa#%@";
 
 char screen[width * height + 1];
 
-vec3 sphere_center = {0.0f, 0.0f, 2.0f};
-float sphere_radius = 1.0f;
+sphere_t sphere = {{0.0f, 0.0f, 2.0f}, 1.0f};
+
+vec3 light_dir = {1.0f, -1.0f, 1.0f};
 
 float magnitude(vec3 vec) {
     return sqrt(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z);
@@ -31,14 +39,25 @@ vec3 normalize(vec3 vec) {
     return (vec3){vec.x / magn, vec.y / magn, vec.z / magn};
 }
 
-bool hit_sphere(vec3 center, float radius, vec3 ray) {
-    float a = dot(ray, ray);
-    float b = -2.0f * dot(ray, center);
-    float c = dot(center, center) - radius*radius;
-    return (b*b - 4*a*c) >= 0;
+float hit_sphere(vec3 center, float radius, vec3 ray) {
+    float a = pow(magnitude(ray), 2.0);
+    float h = dot(ray, center);
+    float c = pow(magnitude(center), 2.0) - radius*radius;
+
+    float discr = h*h - a*c;
+    if (discr < 0.0f) return -1.0f;
+    else {
+        return (h - sqrt(discr)) / a;
+    }
+}
+
+char light2char(float light) {
+    return grayscale[(int)(light * 9)];
 }
 
 int main() {
+    light_dir = normalize(light_dir);
+
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             float nx = ((float)x / width * 2.0f - 1.0f) * aspect * char_aspect;
@@ -46,8 +65,12 @@ int main() {
 
             vec3 dir = normalize((vec3){nx, ny, 1.0f});
 
-            if (hit_sphere(sphere_center, sphere_radius, dir)) {
-                screen[y * width + x] = '@';
+            float t = hit_sphere(sphere.center, sphere.radius, dir);
+            if (t > 0) {
+                vec3 normal = normalize((vec3){t * dir.x, t * dir.y, t * dir.z + 1.0f});
+                float light = dot(normal, light_dir);
+                if (light < 0.0f) light = 0.0f;
+                screen[y * width + x] = light2char(light);
             }
             else screen[y * width + x] = ' ';
         }
