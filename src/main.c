@@ -7,22 +7,40 @@ typedef struct {
 } vec3;
 
 typedef struct {
+    vec3 dir;
+    float dist;
+} camera_t;
+
+typedef struct {
     vec3 center;
     float radius;
 } sphere_t;
+
+typedef struct {
+    vec3 center;
+    float R, r;
+} torus_t;
 
 #define width  120
 #define height 30
 float aspect = width / height;
 float char_aspect = 0.5f;
 
-char *grayscale = " .:-=oa#%@";
+char *grayscale = " .,;(oq#0@";
 
 char screen[width * height + 1];
 
-sphere_t sphere = {{0.0f, 0.0f, 2.0f}, 1.0f};
+sphere_t sphere = {{0.0f, 0.0f, 3.0f}, 2.0f};
 
-vec3 light_dir = {1.0f, -1.0f, 1.0f};
+vec3 light_dir = {0.75f, -1.0f, 1.0f};
+
+vec3 translate(vec3 pos, vec3 dist) {
+    return (vec3){pos.x - dist.x, pos.y - dist.y, pos.z - dist.z};
+}
+
+vec3 rotate(vec3 dir0, vec3 dir1) {
+    return (vec3){dir0.x - dir1.x, dir0.y - dir1.y, dir0.z - dir1.z};
+}
 
 float magnitude(vec3 vec) {
     return sqrt(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z);
@@ -72,7 +90,7 @@ int main() {
                 if (light < 0.0f) light = 0.0f;
                 screen[y * width + x] = light2char(light);
             }
-            else screen[y * width + x] = ' ';
+            else screen[y * width + x] = light2char(0.0f);
         }
     }
 

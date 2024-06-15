@@ -1,7 +1,7 @@
 .PHONY: all clean run
 
 CC        = cc
-TARGET    = bin\raymarching
+TARGET    = bin\raycasting
 
 SRCDIR    = src
 INCDIR    = include
