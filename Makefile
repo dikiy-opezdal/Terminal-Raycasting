@@ -17,6 +17,6 @@ all: $(OBJ)
 	$(CC) $(OBJ) $(CFLAGS) -o $(BLDDIR)/$(TARGET)
 
 clean:
-	del /Q $(BLDDIR)\*
+	del /Q $(BLDDIR)
 $(BLDDIR):
 	mkdir $(BLDDIR)
