@@ -1,85 +1,67 @@
 #include <stdio.h>
-#include <stdbool.h>
 #include <math.h>
+#include <string.h>
 
-typedef struct {
-    double x, y;
-} vec2;
 typedef struct {
     double x, y, z;
-} vec3;
+} vec3_t;
 
-#define d2r 3.141592653589793 / 180.0
+typedef struct {
+    double R, r;
+} torus_t;
 
-#define width  120
-#define height 30
-double aspect = (double)width / (double)height;
-double char_aspect = 0.5;
+#define W 120
+#define H 30
 
-char *grayscale = " .,;(oq#0@";
-
-char screen[width * height + 1];
-
-vec3 light_dir = {0.75, -1.0, 1.0};
-
-double magnitude(vec3 vec) {
-    return sqrt(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z);
+double sign(double num) {
+    return (0 < num) - (0 > num);
 }
 
-double dot(vec3 v0, vec3 v1) {
+double dot(vec3_t v0, vec3_t v1) {
     return (v0.x*v1.x) + (v0.y*v1.y) + (v0.z*v1.z);
 }
 
-vec3 normalize(vec3 vec) {
+double magnitude(vec3_t vec) {
+    return sqrt(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z);
+}
+
+vec3_t normalize(vec3_t vec) {
     double magn = magnitude(vec);
 
     if (magn == 0) return vec;
-    return (vec3){vec.x / magn, vec.y / magn, vec.z / magn};
+    return (vec3_t){vec.x / magn, vec.y / magn, vec.z / magn};
 }
 
-vec3 rot_x(vec3 v0, double angle)
-{
-    vec3 v1 = v0;
-    v1.z = v0.z * cos(angle) - v0.y * sin(angle);
-    v1.y = v0.z * sin(angle) + v0.y * cos(angle);
-    return v1;
-}
-vec3 rot_y(vec3 v0, double angle)
-{
-    vec3 v1 = v0;
-    v1.x = v0.x * cos(angle) - v0.z * sin(angle);
-    v1.z = v0.x * sin(angle) + v0.z * cos(angle);
-    return v1;
-}
-vec3 rot_z(vec3 v0, double angle)
-{
-    vec3 v1 = v0;
-    v1.x = v0.x * cos(angle) - v0.y * sin(angle);
-    v1.y = v0.x * sin(angle) + v0.y * cos(angle);
-    return v1;
+vec3_t get_rd(double x, double y, double aspect) {
+    vec3_t rd = {0.0, 0.0, 1.0};
+
+    rd.x = (x / W * 2.0 - 1.0) * aspect;
+    rd.y = y / H * 2.0 - 1.0;
+
+    return normalize(rd);
 }
 
-double sign(double num) {
-    return (0 > num) - (0 < num);
+char light2char(double light, char *grayscale) {
+    return grayscale[(int)(light * strlen(grayscale))];
 }
 
-// hit_torus function is under The MIT License
+// iTorus function is under The MIT License
 // Copyright © 2014 Inigo Quilez
 // https://www.shadertoy.com/view/4sBGDy
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-double hit_torus(vec3 ro, vec3 rd, vec2 tor)
+double iTorus( vec3_t ro, vec3_t rd, torus_t tor )
 {
     double po = 1.0;
     
-    double Ra2 = tor.x*tor.x;
-    double ra2 = tor.y*tor.y;
+    double Ra2 = tor.R*tor.R;
+    double ra2 = tor.r*tor.r;
 	
     double m = dot(ro,ro);
     double n = dot(ro,rd);
 
     // bounding sphere
     {
-	double h = n*n - m + (tor.x+tor.y)*(tor.x+tor.y);
+	double h = n*n - m + (tor.R+tor.r)*(tor.R+tor.r);
 	if( h<0.0 ) return -1.0;
 	//double t = -n-sqrt(h); // could use this to compute intersections from ro+t*rd
     }
@@ -174,38 +156,35 @@ double hit_torus(vec3 ro, vec3 rd, vec2 tor)
     return result;
 }
 
-char light2char(double light) {
-    return grayscale[(int)(light * 9)];
-}
-
 int main() {
-    vec3 rotation = (vec3){0.0, 0.0, 0.0};
-    while (true) {
-        rotation.y += 0.05*d2r;
+    char screen[W * H + 1];
+    double aspect = (double)W / (double)H * 0.5; // 0.5 — char aspect
+    
+    vec3_t light_dir = normalize((vec3_t){0.75, -1.0, 1.0});
+    char *grayscale = " .,;(oq#0@";
 
-        vec3 trans_light = normalize(
-            rot_z(rot_y(rot_x(light_dir, rotation.x), rotation.y), rotation.z)
-        );
+    vec3_t ro = {0.0, 0.0, 2.0}; // #FIXME: point in center
 
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                double nx = ((double)x / width * 2.0 - 1.0) * aspect * char_aspect;
-                double ny = (double)y / height * 2.0 - 1.0;
+    torus_t torus = {1.0, 0.5};
 
-                vec3 dir = normalize((vec3){nx, ny, 1.0});
+    while (1) {
+        for (int y = 0; y < H; y++) {
+            for (int x = 0; x < W; x++) {
+                vec3_t rd = get_rd((double)x, (double)y, aspect);
 
-                double t = hit_torus((vec3){0.0, 0.0, 2.01}, dir, (vec2){1.0, 0.5});
+                double t = iTorus(ro, rd, torus);
                 if (t > 0.0) {
-                    vec3 normal = normalize((vec3){t * dir.x, t * dir.y, t * dir.z + 1.0});
-                    double light = dot(normal, trans_light);
-                    if (light < 0.0) light = 0.0;
-                    screen[y * width + x] = light2char(light);
+                    vec3_t normal = normalize((vec3_t){t * rd.x, t * rd.y, t * rd.z});
+                    double light = dot(normal, light_dir);
+
+                    if (light < 0.0) light = 1 / strlen(grayscale);
+                    screen[y * W + x] = light2char(light, grayscale);
                 }
-                else screen[y * width + x] = light2char(0.0);
+                else screen[y * W + x] = light2char(0.0, grayscale);
             }
         }
 
-        screen[width * height] = '\0';
+        screen[W * H] = '\0';
         printf("%s", screen);
     }
 
