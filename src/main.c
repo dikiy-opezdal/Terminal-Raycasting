@@ -32,11 +32,12 @@ vec3_t normalize(vec3_t vec) {
     return (vec3_t){vec.x / magn, vec.y / magn, vec.z / magn};
 }
 
-vec3_t get_rd(double x, double y, double aspect) {
-    vec3_t rd = {0.0, 0.0, 1.0};
-
+vec3_t get_rd(vec3_t ro, double x, double y, double aspect) {
+    vec3_t rd = {0.0, 0.0, 0.0};
+    
     rd.x = (x / W * 2.0 - 1.0) * aspect;
-    rd.y = y / H * 2.0 - 1.0;
+    rd.y = -(y / H * 2.0 - 1.0);
+    rd.z = 2.0;
 
     return normalize(rd);
 }
@@ -160,24 +161,26 @@ int main() {
     char screen[W * H + 1];
     double aspect = (double)W / (double)H * 0.5; // 0.5 — char aspect
     
-    vec3_t light_dir = normalize((vec3_t){0.75, -1.0, 1.0});
+    vec3_t light_dir = normalize((vec3_t){0.75, 1.0, 1.0});
     char *grayscale = " .,;(oq#0@";
+    double min_light = 1.0 / strlen(grayscale);
 
-    vec3_t ro = {0.0, 0.0, 2.0}; // #FIXME: point in center
+    vec3_t ro = {0.0, 0.0, -3.5}; // #FIXME: point in center
 
     torus_t torus = {1.0, 0.5};
 
     while (1) {
         for (int y = 0; y < H; y++) {
             for (int x = 0; x < W; x++) {
-                vec3_t rd = get_rd((double)x, (double)y, aspect);
+                // #TODO: rotation
+                vec3_t rd = get_rd(ro, (double)x, (double)y, aspect);
 
                 double t = iTorus(ro, rd, torus);
                 if (t > 0.0) {
                     vec3_t normal = normalize((vec3_t){t * rd.x, t * rd.y, t * rd.z});
                     double light = dot(normal, light_dir);
 
-                    if (light < 0.0) light = 1 / strlen(grayscale);
+                    if (light < min_light) light = min_light;
                     screen[y * W + x] = light2char(light, grayscale);
                 }
                 else screen[y * W + x] = light2char(0.0, grayscale);
