@@ -32,7 +32,7 @@ vec3_t normalize(vec3_t vec) {
     return (vec3_t){vec.x / magn, vec.y / magn, vec.z / magn};
 }
 
-vec3_t get_rd(vec3_t ro, double x, double y, double aspect) {
+vec3_t get_rd(double x, double y, double aspect) {
     vec3_t rd = {0.0, 0.0, 0.0};
     
     rd.x = (x / W * 2.0 - 1.0) * aspect;
@@ -46,7 +46,7 @@ char light2char(double light, char *grayscale) {
     return grayscale[(int)(light * strlen(grayscale))];
 }
 
-// iTorus function is under The MIT License
+// iTorus and nTorus functions are under The MIT License
 // Copyright © 2014 Inigo Quilez
 // https://www.shadertoy.com/view/4sBGDy
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -76,7 +76,7 @@ double iTorus( vec3_t ro, vec3_t rd, torus_t tor )
 	
     #if 1
     // prevent |c1| from being too close to zero
-    if( abs(k3*(k3*k3 - k2) + k1) < 0.01 )
+    if( fabs(k3*(k3*k3 - k2) + k1) < 0.01 )
     {
         po = -1.0;
         double tmp=k1; k1=k3; k3=tmp;
@@ -111,14 +111,14 @@ double iTorus( vec3_t ro, vec3_t rd, torus_t tor )
     else
     {
         // 2 intersections
-        double sQ = pow( sqrt(h) + abs(R), 1.0/3.0 );
-        z = sign(R)*abs( sQ + Q/sQ );
+        double sQ = pow( sqrt(h) + fabs(R), 1.0/3.0 );
+        z = sign(R)*fabs( sQ + Q/sQ );
     }		
     z = c2 - z;
 	
     double d1 = z   - 3.0*c2;
     double d2 = z*z - 3.0*c0;
-    if( abs(d1) < 1.0e-4 )
+    if( fabs(d1) < 1.0e-4 )
     {
         if( d2 < 0.0 ) return -1.0;
         d2 = sqrt(d2);
@@ -157,28 +157,60 @@ double iTorus( vec3_t ro, vec3_t rd, torus_t tor )
     return result;
 }
 
+vec3_t rotate(vec3_t vec, float angle, vec3_t axis) {
+    vec3_t result;
+    vec3_t tmp = vec;
+
+    double angle_x = angle * axis.x;
+    double angle_y = angle * axis.y;
+    double angle_z = angle * axis.z;
+
+    // x
+    result.x = tmp.x;
+    result.y = tmp.y * cos(angle_x) - tmp.z * sin(angle_x);
+    result.z = tmp.y * sin(angle_x) + tmp.z * cos(angle_x);
+    tmp = result;
+
+    // z
+    result.x = tmp.x * cos(angle_z) - tmp.y * sin(angle_z);
+    result.y = tmp.x * sin(angle_z) + tmp.y * cos(angle_z);
+    result.z = tmp.z;
+    tmp = result;
+
+    // y
+    result.x = tmp.z * sin(angle_y) + tmp.x * cos(angle_y);
+    result.y = tmp.y;
+    result.z = tmp.z * cos(angle_y) - tmp.x * sin(angle_y);
+
+    return result;
+}
+
 int main() {
     char screen[W * H + 1];
-    double aspect = (double)W / (double)H * 0.5; // 0.5 — char aspect
+    double aspect = (double)W / (double)H * 0.5;
     
-    vec3_t light_dir = normalize((vec3_t){0.75, 1.0, 1.0});
     char *grayscale = " .,;(oq#0@";
     double min_light = 1.0 / strlen(grayscale);
 
-    vec3_t ro = {0.0, 0.0, -3.5}; // #FIXME: point in center
+    vec3_t ro_init = {0.0, 0.0, 3.5};
 
     torus_t torus = {1.0, 0.5};
 
+    double angle = 0.0;
+
     while (1) {
+        angle += 0.0015;
+
         for (int y = 0; y < H; y++) {
             for (int x = 0; x < W; x++) {
-                // #TODO: rotation
-                vec3_t rd = get_rd(ro, (double)x, (double)y, aspect);
+                vec3_t rd = get_rd((double)x, (double)y, aspect);
+                vec3_t ro = rotate(ro_init, angle, (vec3_t){0.5, 1.0, 0.5});
+                rd = rotate(rd, angle, (vec3_t){0.5, 1.0, 0.5});
 
                 double t = iTorus(ro, rd, torus);
                 if (t > 0.0) {
-                    vec3_t normal = normalize((vec3_t){t * rd.x, t * rd.y, t * rd.z});
-                    double light = dot(normal, light_dir);
+                    // #TODO: light
+                    double light = min_light;
 
                     if (light < min_light) light = min_light;
                     screen[y * W + x] = light2char(light, grayscale);
