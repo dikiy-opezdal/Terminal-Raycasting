@@ -1,6 +1,9 @@
 #include <stdio.h>
-#include <math.h>
 #include <string.h>
+#include <math.h>
+
+#define W 120
+#define H 30
 
 typedef struct {
     double x, y, z;
@@ -10,15 +13,12 @@ typedef struct {
     double R, r;
 } torus_t;
 
-#define W 120
-#define H 30
-
 double sign(double num) {
     return (0 < num) - (0 > num);
 }
 
-double dot(vec3_t v0, vec3_t v1) {
-    return (v0.x*v1.x) + (v0.y*v1.y) + (v0.z*v1.z);
+double dot(vec3_t vec0, vec3_t vec1) {
+    return vec0.x*vec1.x + vec0.y*vec1.y + vec0.z*vec1.z;
 }
 
 double magnitude(vec3_t vec) {
@@ -32,12 +32,34 @@ vec3_t normalize(vec3_t vec) {
     return (vec3_t){vec.x / magn, vec.y / magn, vec.z / magn};
 }
 
+vec3_t rotate(vec3_t vec, vec3_t rot) {
+    vec3_t result;
+    vec3_t tmp;
+
+    // y
+    tmp = vec;
+    result.x = tmp.z * sin(rot.y) + tmp.x * cos(rot.y);
+    result.y = tmp.y;
+    result.z = tmp.z * cos(rot.y) - tmp.x * sin(rot.y);
+    // x
+    tmp = result;
+    result.x = tmp.x;
+    result.y = tmp.y * cos(rot.x) - tmp.z * sin(rot.x);
+    result.z = tmp.y * sin(rot.x) + tmp.z * cos(rot.x);
+    // z
+    tmp = result;
+    result.x = tmp.x * cos(rot.z) - tmp.y * sin(rot.z);
+    result.y = tmp.x * sin(rot.z) + tmp.y * cos(rot.z);
+    result.z = tmp.z;
+
+    return result;
+}
+
 vec3_t get_rd(double x, double y, double aspect) {
-    vec3_t rd = {0.0, 0.0, 0.0};
+    vec3_t rd = {0.0, 0.0, 2.0};
     
-    rd.x = (x / W * 2.0 - 1.0) * aspect;
+    rd.x =  (x / W * 2.0 - 1.0) * aspect;
     rd.y = -(y / H * 2.0 - 1.0);
-    rd.z = 2.0;
 
     return normalize(rd);
 }
@@ -50,6 +72,7 @@ char light2char(double light, char *grayscale) {
 // Copyright © 2014 Inigo Quilez
 // https://www.shadertoy.com/view/4sBGDy
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+// f(x) = (|x|² + R² - r²)² - 4·R²·|xy|² = 0
 double iTorus( vec3_t ro, vec3_t rd, torus_t tor )
 {
     double po = 1.0;
@@ -156,58 +179,39 @@ double iTorus( vec3_t ro, vec3_t rd, torus_t tor )
 
     return result;
 }
-
-vec3_t rotate(vec3_t vec, float angle, vec3_t axis) {
-    vec3_t result;
-    vec3_t tmp = vec;
-
-    double angle_x = angle * axis.x;
-    double angle_y = angle * axis.y;
-    double angle_z = angle * axis.z;
-
-    // x
-    result.x = tmp.x;
-    result.y = tmp.y * cos(angle_x) - tmp.z * sin(angle_x);
-    result.z = tmp.y * sin(angle_x) + tmp.z * cos(angle_x);
-    tmp = result;
-    // z
-    result.x = tmp.x * cos(angle_z) - tmp.y * sin(angle_z);
-    result.y = tmp.x * sin(angle_z) + tmp.y * cos(angle_z);
-    result.z = tmp.z;
-    tmp = result;
-    // y
-    result.x = tmp.z * sin(angle_y) + tmp.x * cos(angle_y);
-    result.y = tmp.y;
-    result.z = tmp.z * cos(angle_y) - tmp.x * sin(angle_y);
-
-    return result;
-}
+// df(x)/dx
+// normalize(pos*(dot(pos,pos) - tor.y*tor.y - tor.x*tor.x*vec3(1.0,1.0,-1.0)));
 vec3_t nTorus(vec3_t pos, torus_t tor) {
-    return normalize((vec3_t){
-        pos.x * (dot(pos, pos) - tor.r * tor.r - tor.R * tor.R * 1.0),
-        pos.y * (dot(pos, pos) - tor.r * tor.r - tor.R * tor.R * 1.0),
-        pos.z * (dot(pos, pos) - tor.r * tor.r - tor.R * tor.R * (-1.0))
-    });
+    double RxR = tor.R * tor.R;
+    vec3_t result = {RxR, RxR, -RxR};
+
+    double tmp = dot(pos, pos) - tor.r * tor.r;
+    result = (vec3_t){tmp - result.x, tmp - result.y, tmp - result.z};
+
+    return normalize((vec3_t){pos.x * result.x, pos.y * result.y, pos.z * result.z});
 }
 
 int main() {
     char screen[W * H + 1];
-    double aspect = (double)W / (double)H * 0.5;
-    char *grayscale = " .,;(oq#0@";
-    vec3_t ro_init = {0.0, 0.0, -3.5};
-    torus_t torus = {1.0, 0.5};
-    vec3_t light_dir = normalize((vec3_t){0.7, 0.6, 0.3});
+    double aspect = (double)W / (double)H * 0.5; // 0.5 — char aspect
 
-    double angle = 0.0;
+    char *grayscale = " .,;(oq#0@"; // " .,:;(coq#0@" " .,:;(coqmlj#0@"
+
+    vec3_t ro_init = {0.0, 0.0, -3.5};
+
+    torus_t torus = {1.0, 0.5};
+    vec3_t obj_rot = {-0.4, 0.0, 0.0};
+
+    vec3_t light_dir = normalize((vec3_t){0.75, 1.0, -0.5});
 
     while (1) {
-        angle += 0.0015;
+        obj_rot.y += 0.0025;
 
         for (int y = 0; y < H; y++) {
             for (int x = 0; x < W; x++) {
-                vec3_t ro = rotate(ro_init, angle, (vec3_t){0.7, 1.0, 0.3});
+                vec3_t ro = rotate(ro_init, obj_rot);
                 vec3_t rd = get_rd((double)x, (double)y, aspect);
-                rd = rotate(rd, angle, (vec3_t){0.7, 1.0, 0.3});
+                rd = rotate(rd, obj_rot);
 
                 double t = iTorus(ro, rd, torus);
                 if (t > 0.0) {
@@ -215,7 +219,7 @@ int main() {
                     vec3_t normal = nTorus(pos, torus);
                     double light = dot(normal, light_dir);
 
-                    if (light < 0.1) light = 0.1;
+                    if (light < 0.1) light = 0.1; // for the object not to be completely invisible
                     screen[y * W + x] = light2char(light, grayscale);
                 }
                 else screen[y * W + x] = light2char(0.0, grayscale);
