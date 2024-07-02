@@ -170,13 +170,11 @@ vec3_t rotate(vec3_t vec, float angle, vec3_t axis) {
     result.y = tmp.y * cos(angle_x) - tmp.z * sin(angle_x);
     result.z = tmp.y * sin(angle_x) + tmp.z * cos(angle_x);
     tmp = result;
-
     // z
     result.x = tmp.x * cos(angle_z) - tmp.y * sin(angle_z);
     result.y = tmp.x * sin(angle_z) + tmp.y * cos(angle_z);
     result.z = tmp.z;
     tmp = result;
-
     // y
     result.x = tmp.z * sin(angle_y) + tmp.x * cos(angle_y);
     result.y = tmp.y;
@@ -184,17 +182,21 @@ vec3_t rotate(vec3_t vec, float angle, vec3_t axis) {
 
     return result;
 }
+vec3_t nTorus(vec3_t pos, torus_t tor) {
+    return normalize((vec3_t){
+        pos.x * (dot(pos, pos) - tor.r * tor.r - tor.R * tor.R * 1.0),
+        pos.y * (dot(pos, pos) - tor.r * tor.r - tor.R * tor.R * 1.0),
+        pos.z * (dot(pos, pos) - tor.r * tor.r - tor.R * tor.R * (-1.0))
+    });
+}
 
 int main() {
     char screen[W * H + 1];
     double aspect = (double)W / (double)H * 0.5;
-    
     char *grayscale = " .,;(oq#0@";
-    double min_light = 1.0 / strlen(grayscale);
-
-    vec3_t ro_init = {0.0, 0.0, 3.5};
-
+    vec3_t ro_init = {0.0, 0.0, -3.5};
     torus_t torus = {1.0, 0.5};
+    vec3_t light_dir = normalize((vec3_t){0.7, 0.6, 0.3});
 
     double angle = 0.0;
 
@@ -203,16 +205,17 @@ int main() {
 
         for (int y = 0; y < H; y++) {
             for (int x = 0; x < W; x++) {
+                vec3_t ro = rotate(ro_init, angle, (vec3_t){0.7, 1.0, 0.3});
                 vec3_t rd = get_rd((double)x, (double)y, aspect);
-                vec3_t ro = rotate(ro_init, angle, (vec3_t){0.5, 1.0, 0.5});
-                rd = rotate(rd, angle, (vec3_t){0.5, 1.0, 0.5});
+                rd = rotate(rd, angle, (vec3_t){0.7, 1.0, 0.3});
 
                 double t = iTorus(ro, rd, torus);
                 if (t > 0.0) {
-                    // #TODO: light
-                    double light = min_light;
+                    vec3_t pos = {ro.x + t * rd.x, ro.y + t * rd.y, ro.z + t * rd.z};
+                    vec3_t normal = nTorus(pos, torus);
+                    double light = dot(normal, light_dir);
 
-                    if (light < min_light) light = min_light;
+                    if (light < 0.1) light = 0.1;
                     screen[y * W + x] = light2char(light, grayscale);
                 }
                 else screen[y * W + x] = light2char(0.0, grayscale);
